@@ -48,22 +48,24 @@ namespace CookingSkill
         }
 
         // increase cooking skill when placing an item on the cooking station
-        [HarmonyPatch(typeof(CookingStation), "CookItem")]
-        internal class Patch_CookingStation_CookItem
+        [HarmonyPatch(typeof(CookingStation), "UseItem")]
+        internal class Patch_CookingStation_UseItem
         {
-            static void Postfix(ref bool __result)
+            static void Postfix(ref bool __result, Humanoid user)
             {
                 if (__result)
-                    Player.m_localPlayer.RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, 0.25f);
+                    ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, 0.25f);
             }
         }
 
         // increase cooking skill when removing a successful cooked item from cooking station
-        [HarmonyPatch(typeof(CookingStation), "RPC_RemoveDoneItem")]
-        internal class Patch_CookingStation_RPC_RemoveDoneItem
+        [HarmonyPatch(typeof(CookingStation), "Interact")]
+        internal class Patch_CookingStation_Interact
         {
-            static void Prefix(ref CookingStation __instance, ref ZNetView ___m_nview)
+            static void Prefix(ref CookingStation __instance, ref ZNetView ___m_nview, Humanoid user, bool hold)
             {
+                if (hold)
+                    return;
                 Traverse t_cookingStation = Traverse.Create(__instance);
                 ZDO zdo = ___m_nview.GetZDO();
                 for (int slot = 0; slot < __instance.m_slots.Length; ++slot)
@@ -72,12 +74,13 @@ namespace CookingSkill
                     bool isItemDone = t_cookingStation.Method("IsItemDone", itemName).GetValue<bool>();
                     if (itemName != "" && itemName != __instance.m_overCookedItem.name && isItemDone)
                     {
-                        Player.m_localPlayer.RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, 0.75f);
+                        ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, 0.75f);
                         break;
                     } 
                 }
             }
         }
+
         // float skillLevel = Player.m_localPlayer.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID)
-    }
+        }
 }
