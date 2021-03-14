@@ -1,7 +1,6 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
-using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using Pipakin.SkillInjectorMod;
@@ -14,7 +13,7 @@ namespace CookingSkill
     public class CookingSkill : BaseUnityPlugin
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
-        public const string PluginName = "CookingSkill";
+        public const string PluginName = "Cooking Skill";
         public const string PluginVersion = "1.0.0";
 
         private static Harmony harmony;
@@ -23,8 +22,9 @@ namespace CookingSkill
         public static ConfigEntry<bool> modEnabled;
 
         private static ConfigEntry<float> configCookingStationXPIncrease;
+        private static ConfigEntry<float> configCauldronXPIncrease;
         private static ConfigEntry<float> configFermenterXPIncrease;
-        //private static ConfigEntry<float> configCookingStationXPIncrease;
+
         private static ConfigEntry<float> configFoodHealthMulitplier;
         private static ConfigEntry<float> configFoodStaminaMulitplier;
 
@@ -35,6 +35,12 @@ namespace CookingSkill
             nexusID = Config.Bind<int>("General", "NexusID", 483, "NexusMods ID for updates.");
             modEnabled = Config.Bind<bool>("General", "Enabled", true, "Enable the mod.");
 
+            configCookingStationXPIncrease = Config.Bind<float>("Cooking Skill XP", "CookingStationXP", 1f, "Cooking skill xp gained when using the Cooking Station.");
+            configCauldronXPIncrease = Config.Bind<float>("Cooking Skill XP", "CauldronXP", 2f, "Cooking skill xp gained when using the Cauldron.");
+            configFermenterXPIncrease = Config.Bind<float>("Cooking Skill XP", "FermenterXP", 6f, "Cooking skill xp gained when fermenting mead.");
+
+            configFoodHealthMulitplier = Config.Bind<float>("Food Effects", "HealthMultiplier", 0.5f, "Buff to Health given when consuming food per Cooking Skill Level. 1f = +1% / Level");
+            configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
 
             if (!modEnabled.Value)
                 return;
@@ -42,32 +48,8 @@ namespace CookingSkill
             harmony = new Harmony(PluginGUID);
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-            configCookingStationXPIncrease = Config.Bind("Cooking Station XP Progression",
-                                           "CookStationLevelingIncrement",
-                                           1f,
-                                           "Experience gain when Cooking skill XP is awarded when using Cooking Station");
-
-            configFermenterXPIncrease = Config.Bind("Fermenter XP Progression",
-                                           "FermenterLevelingIncrement",
-                                           6f,
-                                           "Experience gain when Cooking skill XP is awarded when using Fermenter");
-
-            configFoodHealthMulitplier = Config.Bind("Health Multiplier",
-                                           "HealthMultiplier",
-                                           0.5f,
-                                           "% Buff of Health given when consuming food per Cooking Skill Level: default .5% per level default");
-
-            configFoodStaminaMulitplier = Config.Bind("Stamina Multiplier",
-                                           "StaminaMultiplier",
-                                           0.5f,
-                                           "% Buff of Stamina given when consuming food per Cooking Skill Level: default .5% per level default");
-
-            // try/catch For debuging via script engine
-            try
-            {
-                SkillInjector.RegisterNewSkill(COOKING_SKILL_ID, "Cooking", "Improves Cooked Food", 1.0f, null, Skills.SkillType.Unarmed);
-            }
-            catch { }
+            if (SkillInjector.GetSkillDef((Skills.SkillType)COOKING_SKILL_ID) == null)
+                SkillInjector.RegisterNewSkill(COOKING_SKILL_ID, "Cooking", "Improves Health and Stamina buffs from consuming food", 1.0f, null, Skills.SkillType.Unarmed);
         }
 
         private void OnDestroy()
@@ -81,10 +63,11 @@ namespace CookingSkill
         }
 
         // ==================================================================== //
-        //              COOKING STATION LOGIC                                   //
+        //              COOKING STATION PATCHES                                 //
         // ==================================================================== //
 
-        #region Cooking Station Logic
+        #region Cooking Station Patches
+
         // increase cooking skill when placing an item on the cooking station
         [HarmonyPatch(typeof(CookingStation), "UseItem")]
         internal class Patch_CookingStation_UseItem
@@ -99,9 +82,6 @@ namespace CookingSkill
             }
         }
 
-
-
-
         // increase cooking skill when removing a successful cooked item from cooking station
         [HarmonyPatch(typeof(CookingStation), "Interact")]
         internal class Patch_CookingStation_Interact
@@ -110,12 +90,15 @@ namespace CookingSkill
             {
                 if (hold)
                     return;
+
                 Traverse t_cookingStation = Traverse.Create(__instance);
                 ZDO zdo = ___m_nview.GetZDO();
+
                 for (int slot = 0; slot < __instance.m_slots.Length; ++slot)
                 {
                     string itemName = zdo.GetString(nameof(slot) + slot);
                     bool isItemDone = t_cookingStation.Method("IsItemDone", itemName).GetValue<bool>();
+
                     if (itemName != "" && itemName != __instance.m_overCookedItem.name && isItemDone)
                     {
                         ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCookingStationXPIncrease.Value * 0.75f);
@@ -125,14 +108,16 @@ namespace CookingSkill
                 }
             }
         }
+
         #endregion
 
 
         // ==================================================================== //
-        //              FERMENTER STATION LOGIC                                 //
+        //              FERMENTER PATCHES                                       //
         // ==================================================================== //
 
-        #region Fermenter Logic
+        #region Fermenter Patches
+
         [HarmonyPatch(typeof(Fermenter), "AddItem")]
         internal class Patch_Fermenter_AddItem
         {
@@ -153,6 +138,7 @@ namespace CookingSkill
             {
                 if (hold || !PrivateArea.CheckAccess(__instance.transform.position))
                     return;
+
                 int status = Traverse.Create(__instance).Method("GetStatus").GetValue<int>();
                 if (status == 3)    // 3 is the enum value for Ready
                 {
@@ -161,42 +147,46 @@ namespace CookingSkill
                 }
             }
         }
+
         #endregion
 
 
         // ==================================================================== //
-        //              COULDRON STATION LOGIC                                  //
+        //              COULDRON PATCHES                                        //
         // ==================================================================== //
 
 
 
         // ==================================================================== //
-        //              FOOD BUFF LOGIC                                         //
+        //              FOOD BUFF PATCHES                                       //
         // ==================================================================== //
 
-        // All Food will gain a % increase in Duration/HP & Stamina per level
-        #region Food Buff Stuff
+        #region Food Buff Patches
+
+        // All Food will gain a % increase in HP & Stamina per level
         [HarmonyPatch(typeof(Player), "EatFood")]
         internal class Patch_Player_EatFood
         {
             static void Prefix(ref Player __instance, ref ItemDrop.ItemData item, ref float[] __state)
             {
-                Traverse t_player = Traverse.Create(__instance);
-                if (!t_player.Method("CanEat", item, false).GetValue<bool>())
+                if (!Traverse.Create(__instance).Method("CanEat", item, false).GetValue<bool>())
                     return;
 
-                float skillLevel = Player.m_localPlayer.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                 float healthSkillModifier = 1f + (configFoodHealthMulitplier.Value * skillLevel);
                 float staminaSkillModifier = 1f + (configFoodStaminaMulitplier.Value * skillLevel);
+
                 Log($"Health Modifier: {healthSkillModifier} | Stamina Modifier: {staminaSkillModifier}");
+
                 __state = new float[] { item.m_shared.m_food, item.m_shared.m_foodStamina};
                 item.m_shared.m_food *= healthSkillModifier;
                 item.m_shared.m_foodStamina *= staminaSkillModifier;
-                Log($"HP Increase from Food :{item.m_shared.m_food}");
-                Log($"Stamina Increase from Food :{item.m_shared.m_foodStamina}");
+
+                Log($"HP Increase from Food: {item.m_shared.m_food}");
+                Log($"Stamina Increase from Food: {item.m_shared.m_foodStamina}");
             }
 
-            static void Postfix(ref bool __result, ref ItemDrop.ItemData item, float[] __state)
+            static void Postfix(ref ItemDrop.ItemData item, float[] __state)
             {
                 if (__state == null || __state.Length == 0)
                     return;
@@ -205,7 +195,7 @@ namespace CookingSkill
                 item.m_shared.m_foodStamina = __state[1];
             }
         }
-        #endregion
 
+        #endregion
     }
 }
