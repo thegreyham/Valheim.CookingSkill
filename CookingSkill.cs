@@ -1,12 +1,11 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
-using System.Reflection;
-using System.Collections.Generic;
-using System.IO;
-using System;
-using UnityEngine;
 using Pipakin.SkillInjectorMod;
+using System.Collections.Generic;
+using System.Reflection;
+using System.IO;
+using UnityEngine;
 
 namespace CookingSkill
 {
@@ -31,10 +30,8 @@ namespace CookingSkill
         private static ConfigEntry<float> configFoodHealthMulitplier;
         private static ConfigEntry<float> configFoodStaminaMulitplier;
 
-        const int COOKING_SKILL_ID = 483;  //nexus mod id :)
-
-
-
+        const int COOKING_SKILL_ID = 483;  // Nexus mod id :)
+        private static Dictionary<string, Texture2D> cachedTextures = new Dictionary<string, Texture2D>();
 
         private void Awake()
         {
@@ -68,16 +65,13 @@ namespace CookingSkill
             Debug.Log($"[{PluginName}] {msg}");
         }
 
-        private static Dictionary<string, Texture2D> cachedTextures = new Dictionary<string, Texture2D>();
-
         private static Sprite LoadCustomTexture(string filename)
         {
-            string str = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), filename);
-            Log(str);
-            if (File.Exists(str))
-                return Sprite.Create(LoadTexture(str), new Rect(0.0f, 0.0f, 32f, 32f), Vector2.zero);
-            Debug.LogError($"Unable to load skill icon! Make sure you place the {filename} file in the plugins directory!");
-            return (Sprite)null;
+            string filepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "assets", filename);
+            if (File.Exists(filepath))
+                return Sprite.Create(LoadTexture(filepath), new Rect(0.0f, 0.0f, 64f, 64f), Vector2.zero);
+            Debug.LogError($"Unable to load skill icon! Make sure you place the {filename} file in the 'Valheim/BepInEx/plugins/assets/' directory!");
+            return null;
         }
 
         private static Texture2D LoadTexture(string filepath)
@@ -141,11 +135,42 @@ namespace CookingSkill
 
 
         // ==================================================================== //
+        //              CAULDRON PATCHES                                        //
+        // ==================================================================== //
+
+        #region Cauldron Patches
+
+        // increase cooking skill when making food in the cauldron
+        [HarmonyPatch(typeof(InventoryGui), "DoCrafting")]
+        internal class Patch_InventoryGui_DoCrafting
+        {
+            static void Prefix(ref InventoryGui __instance, ref Recipe ___m_craftRecipe, Player player)
+            {
+                if (___m_craftRecipe == null)
+                    return;
+
+                bool isCauldron = __instance.m_craftingStationName.text == "Cauldron";
+                bool isCauldronRecipe = ___m_craftRecipe.m_craftingStation.m_name == "$piece_cauldron";
+                bool haveRequirements = player.HaveRequirements(___m_craftRecipe, false, 1) || player.NoCostCheat();
+
+                if (!isCauldron || !isCauldronRecipe || !haveRequirements)
+                    return;
+
+                player.RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCauldronXPIncrease.Value);
+                //Log($"[Cooked Item on Cauldron] Increase Cooking Skill by {configCauldronXPIncrease.Value}");
+            }
+        }
+
+        #endregion
+
+
+        // ==================================================================== //
         //              FERMENTER PATCHES                                       //
         // ==================================================================== //
 
         #region Fermenter Patches
 
+        // increase cooking skill when placing a mead base into the fermenter
         [HarmonyPatch(typeof(Fermenter), "AddItem")]
         internal class Patch_Fermenter_AddItem
         {
@@ -159,6 +184,7 @@ namespace CookingSkill
             }
         }
 
+        // increase cooking skill when removing a fermented mead from the fermenter
         [HarmonyPatch(typeof(Fermenter), "Interact")]
         internal class Patch_Fermenter_Interact
         {
@@ -176,33 +202,6 @@ namespace CookingSkill
             }
         }
 
-        #endregion
-
-
-        // ==================================================================== //
-        //              CAULDRON PATCHES                                        //
-        // ==================================================================== //
-
-        #region Cauldron Patches
-
-        [HarmonyPatch(typeof(InventoryGui), "DoCrafting")]
-        internal class Patch_InventoryGui_DoCrafting
-        {
-            static void Postfix(ref InventoryGui __instance, ref Recipe ___m_craftRecipe, Player player)
-            {
-                if (___m_craftRecipe == null)
-                    return;
-
-                bool isCauldron = __instance.m_craftingStationName.text == "Cauldron";
-                bool isCauldronRecipe = ___m_craftRecipe.m_craftingStation.m_name == "$piece_cauldron";
-
-                if (!isCauldron || !isCauldronRecipe || (!player.HaveRequirements(___m_craftRecipe, false, 1) && !player.NoCostCheat()))
-                    return;
-
-                ((Player)player).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCauldronXPIncrease.Value);
-                //Log($"[Cooked Item on Cauldron] Increase Cooking Skill by {configCauldronXPIncrease.Value}");
-            }
-        }
         #endregion
 
         // ==================================================================== //
