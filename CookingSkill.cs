@@ -2,6 +2,9 @@
 using BepInEx.Configuration;
 using HarmonyLib;
 using System.Reflection;
+using System.Collections.Generic;
+using System.IO;
+using System;
 using UnityEngine;
 using Pipakin.SkillInjectorMod;
 
@@ -30,6 +33,9 @@ namespace CookingSkill
 
         const int COOKING_SKILL_ID = 483;  //nexus mod id :)
 
+
+
+
         private void Awake()
         {
             nexusID = Config.Bind<int>("General", "NexusID", 483, "NexusMods ID for updates.");
@@ -49,7 +55,7 @@ namespace CookingSkill
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
             if (SkillInjector.GetSkillDef((Skills.SkillType)COOKING_SKILL_ID) == null)
-                SkillInjector.RegisterNewSkill(COOKING_SKILL_ID, "Cooking", "Improves Health and Stamina buffs from consuming food", 1.0f, null, Skills.SkillType.Unarmed);
+                SkillInjector.RegisterNewSkill(COOKING_SKILL_ID, "Cooking", "Improves Health and Stamina buffs from consuming food", 1.0f, LoadCustomTexture("meat_cooked.png"), Skills.SkillType.Knives);
         }
 
         private void OnDestroy()
@@ -61,6 +67,28 @@ namespace CookingSkill
         {
             Debug.Log($"[{PluginName}] {msg}");
         }
+
+        private static Dictionary<string, Texture2D> cachedTextures = new Dictionary<string, Texture2D>();
+
+        private static Sprite LoadCustomTexture(string filename)
+        {
+            string str = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), filename);
+            Log(str);
+            if (File.Exists(str))
+                return Sprite.Create(LoadTexture(str), new Rect(0.0f, 0.0f, 32f, 32f), Vector2.zero);
+            Debug.LogError($"Unable to load skill icon! Make sure you place the {filename} file in the plugins directory!");
+            return (Sprite)null;
+        }
+
+        private static Texture2D LoadTexture(string filepath)
+        {
+            if (cachedTextures.ContainsKey(filepath))
+                return cachedTextures[filepath];
+            Texture2D texture2D = new Texture2D(0, 0);
+            ImageConversion.LoadImage(texture2D, File.ReadAllBytes(filepath));
+            return texture2D;
+        }
+
 
         // ==================================================================== //
         //              COOKING STATION PATCHES                                 //
@@ -77,7 +105,7 @@ namespace CookingSkill
                 if (__result)
                 {
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCookingStationXPIncrease.Value * 0.25f);
-                    Log($"[Add Item to Cook Station] Increase Cooking Skill by {configCookingStationXPIncrease.Value * 0.25f}");
+                    //Log($"[Add Item to Cook Station] Increase Cooking Skill by {configCookingStationXPIncrease.Value * 0.25f}");
                 }
             }
         }
@@ -102,7 +130,7 @@ namespace CookingSkill
                     if (itemName != "" && itemName != __instance.m_overCookedItem.name && isItemDone)
                     {
                         ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCookingStationXPIncrease.Value * 0.75f);
-                        Log($"[Removed Cooked Item from Cook Station] Increase Cooking Skill by {configCookingStationXPIncrease.Value * 0.75f}");
+                        //Log($"[Removed Cooked Item from Cook Station] Increase Cooking Skill by {configCookingStationXPIncrease.Value * 0.75f}");
                         break;
                     }
                 }
@@ -126,7 +154,7 @@ namespace CookingSkill
                 if (__result)
                 {
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configFermenterXPIncrease.Value * 0.5f);
-                    Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f}");
+                    //Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f}");
                 }
             }
         }
@@ -143,7 +171,7 @@ namespace CookingSkill
                 if (status == 3)    // 3 is the enum value for Ready
                 {
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configFermenterXPIncrease.Value * 0.5f);
-                    Log($"[Removed Item from Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f}");
+                    //Log($"[Removed Item from Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f}");
                 }
             }
         }
@@ -152,10 +180,30 @@ namespace CookingSkill
 
 
         // ==================================================================== //
-        //              COULDRON PATCHES                                        //
+        //              CAULDRON PATCHES                                        //
         // ==================================================================== //
 
+        #region Cauldron Patches
 
+        [HarmonyPatch(typeof(InventoryGui), "DoCrafting")]
+        internal class Patch_InventoryGui_DoCrafting
+        {
+            static void Postfix(ref InventoryGui __instance, ref Recipe ___m_craftRecipe, Player player)
+            {
+                if (___m_craftRecipe == null)
+                    return;
+
+                bool isCauldron = __instance.m_craftingStationName.text == "Cauldron";
+                bool isCauldronRecipe = ___m_craftRecipe.m_craftingStation.m_name == "$piece_cauldron";
+
+                if (!isCauldron || !isCauldronRecipe || (!player.HaveRequirements(___m_craftRecipe, false, 1) && !player.NoCostCheat()))
+                    return;
+
+                ((Player)player).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCauldronXPIncrease.Value);
+                //Log($"[Cooked Item on Cauldron] Increase Cooking Skill by {configCauldronXPIncrease.Value}");
+            }
+        }
+        #endregion
 
         // ==================================================================== //
         //              FOOD BUFF PATCHES                                       //
@@ -176,14 +224,9 @@ namespace CookingSkill
                 float healthSkillModifier = 1f + (configFoodHealthMulitplier.Value * skillLevel);
                 float staminaSkillModifier = 1f + (configFoodStaminaMulitplier.Value * skillLevel);
 
-                Log($"Health Modifier: {healthSkillModifier} | Stamina Modifier: {staminaSkillModifier}");
-
                 __state = new float[] { item.m_shared.m_food, item.m_shared.m_foodStamina};
                 item.m_shared.m_food *= healthSkillModifier;
                 item.m_shared.m_foodStamina *= staminaSkillModifier;
-
-                Log($"HP Increase from Food: {item.m_shared.m_food}");
-                Log($"Stamina Increase from Food: {item.m_shared.m_foodStamina}");
             }
 
             static void Postfix(ref ItemDrop.ItemData item, float[] __state)
