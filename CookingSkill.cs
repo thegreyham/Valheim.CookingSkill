@@ -16,7 +16,7 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.0.1";
 
         private static Harmony harmony;
 
@@ -149,8 +149,8 @@ namespace CookingSkill
                 if (___m_craftRecipe == null)
                     return;
 
-                bool isCauldron = __instance.m_craftingStationName.text == "Cauldron";
-                bool isCauldronRecipe = ___m_craftRecipe.m_craftingStation.m_name == "$piece_cauldron";
+                bool isCauldron = __instance.m_craftingStationName?.text == "Cauldron";
+                bool isCauldronRecipe = ___m_craftRecipe.m_craftingStation?.m_name == "$piece_cauldron";
                 bool haveRequirements = player.HaveRequirements(___m_craftRecipe, false, 1) || player.NoCostCheat();
 
                 if (!isCauldron || !isCauldronRecipe || !haveRequirements)
