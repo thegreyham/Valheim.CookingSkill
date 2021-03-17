@@ -265,11 +265,11 @@ namespace CookingSkill
                     float newBurnTime = food.m_item.m_shared.m_foodBurnTime * durationSkillModifier;
                     //float newBurnTime = 30f * durationSkillModifier;
                     float healthCheck = food.m_health - (food.m_item.m_shared.m_food / newBurnTime);
-                    if (healthCheck > -2)
+                    if (healthCheck > 0.5f)
                     {
                         __state.Add(food.m_item.m_shared.m_foodBurnTime);
                         food.m_item.m_shared.m_foodBurnTime = newBurnTime;
-                        Log($"{food.m_name}: {healthCheck}");
+                        //Log($"{food.m_name}: {healthCheck}");
                     }
                 }               
             }
@@ -289,7 +289,11 @@ namespace CookingSkill
                     if (___m_foods.Count > __state.Count)
                     {
                         for (int i = 0; i < ___m_foods.Count; i++)
+                        {
+                            if (i > __state.Count)
+                                return;
                             ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
+                        }
                     }
                     if (__state.Count > ___m_foods.Count)
                     {
