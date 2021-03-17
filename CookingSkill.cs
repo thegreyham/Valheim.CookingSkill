@@ -16,12 +16,13 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.0.1";
+        public const string PluginVersion = "1.1.0";
 
         private static Harmony harmony;
 
         public static ConfigEntry<int> nexusID;
         public static ConfigEntry<bool> modEnabled;
+
 
         private static ConfigEntry<float> configCookingStationXPIncrease;
         private static ConfigEntry<float> configCauldronXPIncrease;
@@ -29,6 +30,7 @@ namespace CookingSkill
 
         private static ConfigEntry<float> configFoodHealthMulitplier;
         private static ConfigEntry<float> configFoodStaminaMulitplier;
+        private static ConfigEntry<float> configFoodDurationMulitplier;
 
         const int COOKING_SKILL_ID = 483;  // Nexus mod id :)
         private static Dictionary<string, Texture2D> cachedTextures = new Dictionary<string, Texture2D>();
@@ -44,6 +46,7 @@ namespace CookingSkill
 
             configFoodHealthMulitplier = Config.Bind<float>("Food Effects", "HealthMultiplier", 0.5f, "Buff to Health given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
+            configFoodDurationMulitplier = Config.Bind<float>("Food Effects", "DurationMultiplier", 1f, "Buff to Food Duration when consuming food per Cooking Skill Level. 1f = +1% / Level");
 
             if (!modEnabled.Value)
                 return;
@@ -60,9 +63,9 @@ namespace CookingSkill
             harmony.UnpatchSelf();
         }
 
-        private static void Log(string msg)
+        private static void Log(object msg)
         {
-            Debug.Log($"[{PluginName}] {msg}");
+            Debug.Log($"[{PluginName}] {msg.ToString()}");
         }
 
         private static Sprite LoadCustomTexture(string filename)
@@ -216,6 +219,9 @@ namespace CookingSkill
         {
             static void Prefix(ref Player __instance, ref ItemDrop.ItemData item, ref float[] __state)
             {
+                if (configFoodHealthMulitplier.Value == 0f && configFoodStaminaMulitplier.Value == 0f)
+                    return;
+
                 if (!Traverse.Create(__instance).Method("CanEat", item, false).GetValue<bool>())
                     return;
 
@@ -230,6 +236,9 @@ namespace CookingSkill
 
             static void Postfix(ref ItemDrop.ItemData item, float[] __state)
             {
+                if (configFoodHealthMulitplier.Value == 0f && configFoodStaminaMulitplier.Value == 0f)
+                    return;
+
                 if (__state == null || __state.Length == 0)
                     return;
                 
@@ -238,6 +247,48 @@ namespace CookingSkill
             }
         }
 
+        [HarmonyPatch(typeof(Player), "UpdateFood")]
+        internal class Patch_Player_UpdateFood
+        {
+            static void Prefix(ref Player __instance, ref bool forceUpdate, ref List<Player.Food> ___m_foods, ref List<float> __state)
+            {
+                if (forceUpdate || configFoodDurationMulitplier.Value == 0f)
+                    return;
+
+                __state = new List<float>();
+
+                float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * skillLevel);
+
+                foreach (Player.Food food in ___m_foods)
+                {
+                    float newBurnTime = food.m_item.m_shared.m_foodBurnTime * durationSkillModifier;
+                    //float newBurnTime = 30f * durationSkillModifier;
+                    float healthCheck = food.m_health - (food.m_item.m_shared.m_food / newBurnTime);
+                    if (healthCheck > 0)
+                    {
+                        __state.Add(food.m_item.m_shared.m_foodBurnTime);
+                        food.m_item.m_shared.m_foodBurnTime = newBurnTime;
+                    }
+                }               
+            }
+
+            static void Postfix(ref List<Player.Food> ___m_foods, ref List<float> __state)
+            {
+                if (configFoodDurationMulitplier.Value == 0f)
+                    return;
+
+                if (__state == null || __state.Count == 0)
+                    return;
+
+                if (___m_foods.Count != __state.Count)
+                    Log($"m_foods: {___m_foods.Count} | __state: {__state.Count}");
+
+                for (int i = 0; i < ___m_foods.Count; i++)
+                    ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
+            }
+        }
+        
         #endregion
     }
 }
