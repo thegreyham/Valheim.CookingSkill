@@ -16,13 +16,12 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.1.1";
 
         private static Harmony harmony;
 
         public static ConfigEntry<int> nexusID;
         public static ConfigEntry<bool> modEnabled;
-
 
         private static ConfigEntry<float> configCookingStationXPIncrease;
         private static ConfigEntry<float> configCauldronXPIncrease;
@@ -68,12 +67,22 @@ namespace CookingSkill
             Debug.Log($"[{PluginName}] {msg.ToString()}");
         }
 
+        private static void Warn(object msg)
+        {
+            Debug.LogWarning($"[{PluginName}] {msg.ToString()}");
+        }
+
+        private static void LogError(object msg)
+        {
+            Debug.LogError($"[{PluginName}] {msg.ToString()}");
+        }
+
         private static Sprite LoadCustomTexture(string filename)
         {
             string filepath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "assets", filename);
             if (File.Exists(filepath))
                 return Sprite.Create(LoadTexture(filepath), new Rect(0.0f, 0.0f, 64f, 64f), Vector2.zero);
-            Debug.LogError($"Unable to load skill icon! Make sure you place the {filename} file in the 'Valheim/BepInEx/plugins/assets/' directory!");
+            LogError($"Unable to load skill icon! Make sure you place the {filename} file in the 'Valheim/BepInEx/plugins/assets/' directory!");
             return null;
         }
 
@@ -211,7 +220,7 @@ namespace CookingSkill
         //              FOOD BUFF PATCHES                                       //
         // ==================================================================== //
 
-        #region Food Buff Patches
+        #region Health & Stamina Food Buff Patches
 
         // All Food will gain a % increase in HP & Stamina per level
         [HarmonyPatch(typeof(Player), "EatFood")]
@@ -228,10 +237,14 @@ namespace CookingSkill
                 float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                 float healthSkillModifier = 1f + (configFoodHealthMulitplier.Value * skillLevel);
                 float staminaSkillModifier = 1f + (configFoodStaminaMulitplier.Value * skillLevel);
+                float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * skillLevel);
 
-                __state = new float[] { item.m_shared.m_food, item.m_shared.m_foodStamina};
+                __state = new float[] { item.m_shared.m_food, item.m_shared.m_foodStamina };
                 item.m_shared.m_food *= healthSkillModifier;
                 item.m_shared.m_foodStamina *= staminaSkillModifier;
+                float newBurnTime = ((int)(item.m_shared.m_foodBurnTime * durationSkillModifier * 100)) / 100f;
+
+                Log($"Cooking Skill buffed {item.m_dropPrefab.name}:\nHealth: {__state[0]} -> {item.m_shared.m_food}\nStamina: {__state[1]} -> {item.m_shared.m_foodStamina}\nDuration: {item.m_shared.m_foodBurnTime} sec -> {newBurnTime} sec");
             }
 
             static void Postfix(ref ItemDrop.ItemData item, float[] __state)
@@ -247,35 +260,45 @@ namespace CookingSkill
             }
         }
 
+        #endregion
+
+        #region Food Duration Buff Patches
+
         [HarmonyPatch(typeof(Player), "UpdateFood")]
         internal class Patch_Player_UpdateFood
         {
-            static void Prefix(ref Player __instance, ref bool forceUpdate, ref List<Player.Food> ___m_foods, ref List<float> __state)
+            private struct FoodState
+            {
+                public Player.Food food;
+                public float originalBurnTime;
+                public FoodState(ref Player.Food _food, float _originalBurnTime)
+                {
+                    this.food = _food;
+                    this.originalBurnTime = _originalBurnTime;
+                }
+            }
+
+            static void Prefix(ref Player __instance, ref bool forceUpdate, ref List<Player.Food> ___m_foods, ref Dictionary<string, FoodState> __state)
             {
                 if (forceUpdate || configFoodDurationMulitplier.Value == 0f)
                     return;
 
-                __state = new List<float>(); ;
+                __state = new Dictionary<string, FoodState>(); ;
 
                 float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                 float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * skillLevel);
 
-                foreach (Player.Food food in ___m_foods)
+                for (int i = 0; i < ___m_foods.Count; i++)
                 {
+                    Player.Food food = ___m_foods[i];
                     float newBurnTime = food.m_item.m_shared.m_foodBurnTime * durationSkillModifier;
-                    //float newBurnTime = 30f * durationSkillModifier;
-                    float healthCheck = food.m_health - (food.m_item.m_shared.m_food / newBurnTime);
-                    if (healthCheck > 0.5f)
-                    {
-                        __state.Add(food.m_item.m_shared.m_foodBurnTime);
-                        food.m_item.m_shared.m_foodBurnTime = newBurnTime;
-                        //Log($"{food.m_name}: {healthCheck}");
-                    }
+
+                    __state.Add(food.m_name, new FoodState(ref food, food.m_item.m_shared.m_foodBurnTime));
+                    ___m_foods[i].m_item.m_shared.m_foodBurnTime = newBurnTime;
                 }               
             }
 
-            // potential fix. Set the __State to a dictionary and add the healthChecker to it. If the health checker returns negative values ensure the food is being reset.
-            static void Postfix(ref List<Player.Food> ___m_foods, ref List<float> __state)
+            static void Postfix(ref List<Player.Food> ___m_foods, ref Dictionary<string, FoodState> __state)
             {
                 if (configFoodDurationMulitplier.Value == 0f)
                     return;
@@ -283,39 +306,25 @@ namespace CookingSkill
                 if (__state == null || __state.Count == 0)
                     return;
 
-                if (___m_foods.Count != __state.Count)
-                {
-                    Log($"m_foods: {___m_foods.Count} | __state: {__state.Count}");
-                    if (___m_foods.Count > __state.Count)
-                    {
-                        for (int i = 0; i < ___m_foods.Count; i++)
-                        {
-                            if (i > __state.Count)
-                                return;
-                            ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
-                        }
-                    }
-                    if (__state.Count > ___m_foods.Count)
-                    {
-                        foreach (var item in __state)
-                        {
-                            Log($"State is > Count. Need to fix logic here. Value for __State: {item}");
-                            //object updateFoodBurn = item.Key;
-                            //updateFoodBurn.m_item.m_shared.m_foodBurnTime = item.Value;
-                        }
-                        return;
-                    }
+                List<string> eatenFoodNames = new List<string>();
 
-
-                }
-                else
+                for (int i = 0; i < ___m_foods.Count; i++)
                 {
-                    for (int i = 0; i < ___m_foods.Count; i++)
-                        ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
+                    eatenFoodNames.Add(___m_foods[i].m_name);
+
+                    if (__state.ContainsKey(___m_foods[i].m_name))
+                        ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[___m_foods[i].m_name].originalBurnTime;
+                    else
+                        Warn($"Player.UpdateFood().Postfix :: __state did not contain {___m_foods[i].m_name}.");
                 }
+
+                // Reset burnTime of expired food
+                foreach (var stateItem in __state)
+                    if (!eatenFoodNames.Contains(stateItem.Key))
+                        stateItem.Value.food.m_item.m_shared.m_foodBurnTime = stateItem.Value.originalBurnTime;
             }
         }
-        
+
         #endregion
     }
 }
