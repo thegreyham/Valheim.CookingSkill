@@ -255,7 +255,7 @@ namespace CookingSkill
                 if (forceUpdate || configFoodDurationMulitplier.Value == 0f)
                     return;
 
-                __state = new List<float>();
+                __state = new List<float>(); ;
 
                 float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                 float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * skillLevel);
@@ -265,14 +265,16 @@ namespace CookingSkill
                     float newBurnTime = food.m_item.m_shared.m_foodBurnTime * durationSkillModifier;
                     //float newBurnTime = 30f * durationSkillModifier;
                     float healthCheck = food.m_health - (food.m_item.m_shared.m_food / newBurnTime);
-                    if (healthCheck > 0)
+                    if (healthCheck > -2)
                     {
                         __state.Add(food.m_item.m_shared.m_foodBurnTime);
                         food.m_item.m_shared.m_foodBurnTime = newBurnTime;
+                        Log($"{food.m_name}: {healthCheck}");
                     }
                 }               
             }
 
+            // potential fix. Set the __State to a dictionary and add the healthChecker to it. If the health checker returns negative values ensure the food is being reset.
             static void Postfix(ref List<Player.Food> ___m_foods, ref List<float> __state)
             {
                 if (configFoodDurationMulitplier.Value == 0f)
@@ -282,10 +284,31 @@ namespace CookingSkill
                     return;
 
                 if (___m_foods.Count != __state.Count)
+                {
                     Log($"m_foods: {___m_foods.Count} | __state: {__state.Count}");
+                    if (___m_foods.Count > __state.Count)
+                    {
+                        for (int i = 0; i < ___m_foods.Count; i++)
+                            ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
+                    }
+                    if (__state.Count > ___m_foods.Count)
+                    {
+                        foreach (var item in __state)
+                        {
+                            Log($"State is > Count. Need to fix logic here. Value for __State: {item}");
+                            //object updateFoodBurn = item.Key;
+                            //updateFoodBurn.m_item.m_shared.m_foodBurnTime = item.Value;
+                        }
+                        return;
+                    }
 
-                for (int i = 0; i < ___m_foods.Count; i++)
-                    ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
+
+                }
+                else
+                {
+                    for (int i = 0; i < ___m_foods.Count; i++)
+                        ___m_foods[i].m_item.m_shared.m_foodBurnTime = __state[i];
+                }
             }
         }
         
