@@ -16,7 +16,7 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.1.2";
+        public const string PluginVersion = "1.1.3";
 
         private static Harmony harmony;
 
