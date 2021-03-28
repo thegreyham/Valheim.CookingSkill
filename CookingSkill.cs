@@ -16,7 +16,7 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.1.3";
+        public const string PluginVersion = "1.1.4";
 
         private static Harmony harmony;
 
@@ -30,6 +30,7 @@ namespace CookingSkill
         private static ConfigEntry<float> configFoodHealthMulitplier;
         private static ConfigEntry<float> configFoodStaminaMulitplier;
         private static ConfigEntry<float> configFoodDurationMulitplier;
+        private static ConfigEntry<float> configFermenterDuration;
 
         const int COOKING_SKILL_ID = 483;  // Nexus mod id :)
         private static Dictionary<string, Texture2D> cachedTextures = new Dictionary<string, Texture2D>();
@@ -46,6 +47,7 @@ namespace CookingSkill
             configFoodHealthMulitplier = Config.Bind<float>("Food Effects", "HealthMultiplier", 0.5f, "Buff to Health given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodDurationMulitplier = Config.Bind<float>("Food Effects", "DurationMultiplier", 1f, "Buff to Food Duration when consuming food per Cooking Skill Level. 1f = +1% / Level");
+            configFermenterDuration = Config.Bind<float>("Food Effects", "FermenterDuration", .66f, "Reduces Fermentation duration per Cooking Skill Level. 1f = -1% / Level");
 
             if (!modEnabled.Value)
                 return;
@@ -185,12 +187,27 @@ namespace CookingSkill
         [HarmonyPatch(typeof(Fermenter), "AddItem")]
         internal class Patch_Fermenter_AddItem
         {
-            static void Postfix(ref bool __result, Humanoid user)
+            static void Postfix(ref bool __result, Humanoid user, ref Fermenter __instance)
             {
                 if (__result)
                 {
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configFermenterXPIncrease.Value * 0.5f);
                     //Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f}");
+
+                    if (configFermenterDuration.Value <= 0)
+                        return;
+
+                    float baseFermenterDuration = 2400f;                   
+                    float skillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                    float FoodDurationMultiplier = (100f - ((skillLevel * 100) * configFermenterDuration.Value)) / 100;
+                    float newFermenterDuration = baseFermenterDuration * FoodDurationMultiplier;
+
+                    if (newFermenterDuration <= 10)
+                        newFermenterDuration = 10;
+
+                    Log($"Fermenter Duration = {newFermenterDuration}");
+                    __instance.m_fermentationDuration = newFermenterDuration;
+
                 }
             }
         }
