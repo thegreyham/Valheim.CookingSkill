@@ -102,11 +102,13 @@ namespace CookingSkill
         //              SPAWN DETAILS                                           //
         // ==================================================================== //
         [HarmonyPatch(typeof(Player), "Update")]
-        public static class getSkillLevel
+        public static class GetSkillLevel
         {
             private static void Postfix(ref Player __instance)
             {
+
                 SkillLevel = ((Player)__instance).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                Log($"Cooking Skill Level: {SkillLevel}");
             }
         }
 
