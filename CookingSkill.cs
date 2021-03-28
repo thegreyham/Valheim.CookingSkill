@@ -32,6 +32,7 @@ namespace CookingSkill
         private static ConfigEntry<float> configFoodDurationMulitplier;
         private static ConfigEntry<float> configFermenterDuration;
 
+        private static float SkillLevel = 0f;
         const int COOKING_SKILL_ID = 483;  // Nexus mod id :)
         private static Dictionary<string, Texture2D> cachedTextures = new Dictionary<string, Texture2D>();
 
@@ -97,6 +98,17 @@ namespace CookingSkill
             return texture2D;
         }
 
+        // ==================================================================== //
+        //              SPAWN DETAILS                                           //
+        // ==================================================================== //
+        [HarmonyPatch(typeof(Player), "Update")]
+        public static class getSkillLevel
+        {
+            private static void Postfix(ref Player __instance)
+            {
+                SkillLevel = ((Player)__instance).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+            }
+        }
 
         // ==================================================================== //
         //              COOKING STATION PATCHES                                 //
@@ -194,12 +206,13 @@ namespace CookingSkill
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configFermenterXPIncrease.Value * 0.5f);
                     //Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f}");
 
+                    // Set the fermenter duration when adding new item to fermenter.
                     if (configFermenterDuration.Value <= 0)
                         return;
 
                     float baseFermenterDuration = 2400f;                   
-                    float skillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                    float FoodDurationMultiplier = (100f - ((skillLevel * 100) * configFermenterDuration.Value)) / 100;
+                    //float skillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                    float FoodDurationMultiplier = (100f - ((SkillLevel * 100) * configFermenterDuration.Value)) / 100;
                     float newFermenterDuration = baseFermenterDuration * FoodDurationMultiplier;
 
                     if (newFermenterDuration <= 10)
@@ -250,10 +263,10 @@ namespace CookingSkill
                 if (!Traverse.Create(__instance).Method("CanEat", item, false).GetValue<bool>())
                     return;
 
-                float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                float healthSkillModifier = 1f + (configFoodHealthMulitplier.Value * skillLevel);
-                float staminaSkillModifier = 1f + (configFoodStaminaMulitplier.Value * skillLevel);
-                float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * skillLevel);
+                //float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                float healthSkillModifier = 1f + (configFoodHealthMulitplier.Value * SkillLevel);
+                float staminaSkillModifier = 1f + (configFoodStaminaMulitplier.Value * SkillLevel);
+                float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * SkillLevel);
 
                 __state = new float[] { item.m_shared.m_food, item.m_shared.m_foodStamina };
                 item.m_shared.m_food *= healthSkillModifier;
@@ -301,8 +314,8 @@ namespace CookingSkill
 
                 __state = new Dictionary<string, FoodState>(); ;
 
-                float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * skillLevel);
+                //float skillLevel = __instance.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                float durationSkillModifier = 1f + (configFoodDurationMulitplier.Value * SkillLevel);
 
                 for (int i = 0; i < ___m_foods.Count; i++)
                 {
@@ -341,6 +354,27 @@ namespace CookingSkill
             }
         }
 
+        // used to set the Fermenter duration when the game is loaded.
+        [HarmonyPatch(typeof(Fermenter), "Awake")]
+        public static class ApplyFermenterChanges
+        {
+            static void Prefix(ref Fermenter __instance)
+            {
+                if (configFermenterDuration.Value <= 0)
+                    return;
+
+                float baseFermenterDuration = 2400f;
+                //float skillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                float FoodDurationMultiplier = (100f - ((SkillLevel * 100) * configFermenterDuration.Value)) / 100;
+                float newFermenterDuration = baseFermenterDuration * FoodDurationMultiplier;
+
+                if (newFermenterDuration <= 10)
+                    newFermenterDuration = 10;
+
+                Log($"Fermenter Duration = {newFermenterDuration}");
+                __instance.m_fermentationDuration = newFermenterDuration;
+            }
+        }
         #endregion
     }
 }
