@@ -108,7 +108,8 @@ namespace CookingSkill
             {
 
                 SkillLevel = ((Player)__instance).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                Log($"Cooking Skill Level: {SkillLevel}");
+                //Log($"Cooking Skill Level: {SkillLevel}");
+                //check if skill level 0 causes issues?
             }
         }
 
@@ -212,17 +213,23 @@ namespace CookingSkill
                     if (configFermenterDuration.Value <= 0)
                         return;
 
+
+                    float currentFermenterDuration = __instance.m_fermentationDuration;
+                    Log($"Current Fermenter Duration = {currentFermenterDuration}");
                     float baseFermenterDuration = 2400f;                   
                     //float skillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                     float FoodDurationMultiplier = (100f - ((SkillLevel * 100) * configFermenterDuration.Value)) / 100;
                     float newFermenterDuration = baseFermenterDuration * FoodDurationMultiplier;
 
                     if (newFermenterDuration <= 10)
-                        newFermenterDuration = 10;
+                        newFermenterDuration = 10;  
 
-                    Log($"Fermenter Duration = {newFermenterDuration}");
-                    __instance.m_fermentationDuration = newFermenterDuration;
-
+                    // if your ferment duration calculation is less than the current one update it, otherwise leave it.
+                    if (newFermenterDuration < currentFermenterDuration)
+                    {
+                        Log($"Updating Fermenter Duration to {newFermenterDuration}");
+                        __instance.m_fermentationDuration = newFermenterDuration;
+                    }
                 }
             }
         }
@@ -364,17 +371,24 @@ namespace CookingSkill
             {
                 if (configFermenterDuration.Value <= 0)
                     return;
-
+                float onLoadFermenterDuration = __instance.m_fermentationDuration;
+                Log($"On Load Fermenter Duration = {onLoadFermenterDuration}");
                 float baseFermenterDuration = 2400f;
                 //float skillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                 float FoodDurationMultiplier = (100f - ((SkillLevel * 100) * configFermenterDuration.Value)) / 100;
                 float newFermenterDuration = baseFermenterDuration * FoodDurationMultiplier;
 
+                // check the current fermenter duration. if there are other players already loaded into the game
+                // then this should be an already adjusted value, Set duration to user with the highest skill.
+
                 if (newFermenterDuration <= 10)
                     newFermenterDuration = 10;
 
-                Log($"Fermenter Duration = {newFermenterDuration}");
-                __instance.m_fermentationDuration = newFermenterDuration;
+                if (newFermenterDuration < onLoadFermenterDuration)
+                {
+                    Log($"Fermenter Duration = {newFermenterDuration}");
+                    __instance.m_fermentationDuration = newFermenterDuration;
+                }
             }
         }
         #endregion
