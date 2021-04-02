@@ -16,7 +16,7 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.1.4";
+        public const string PluginVersion = "1.1.5";
 
         private static Harmony harmony;
 
@@ -32,6 +32,7 @@ namespace CookingSkill
         private static ConfigEntry<float> configFoodStaminaMulitplier;
         private static ConfigEntry<float> configFoodDurationMulitplier;
         private static ConfigEntry<float> configFermenterDuration;
+        private static ConfigEntry<bool> configFermenterDrops;
 
         private static float SkillLevel = 0f;
 
@@ -53,6 +54,7 @@ namespace CookingSkill
             configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodDurationMulitplier = Config.Bind<float>("Food Effects", "DurationMultiplier", 1f, "Buff to Food Duration when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFermenterDuration = Config.Bind<float>("Food Effects", "FermenterDuration", .66f, "Reduces Fermentation duration per Cooking Skill Level. 1f = -1% / Level");
+            configFermenterDrops = Config.Bind<bool>("Food Effects", "FermenterDrops", true, "Adds one extra fermener drop at lv 50/75 & 100");
 
             if (!modEnabled.Value)
                 return;
@@ -217,7 +219,7 @@ namespace CookingSkill
                 {
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configFermenterXPIncrease.Value * 0.5f);
                     SkillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                    //Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f} | [Level:{SkillLevel}]");
+                    Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f} | [Level:{SkillLevel}]");
 
                     // Set the fermenter duration when adding new item to fermenter.
                     if (configFermenterDuration.Value <= 0)
@@ -393,8 +395,28 @@ namespace CookingSkill
 
                 if (newFermenterDuration < onLoadFermenterDuration)
                 {
-                    //Log($"[Fermenter Awake] Update Fermenter Duration = {newFermenterDuration}");
+                    Log($"[Fermenter Awake] Update Fermenter Duration = {newFermenterDuration}");
                     __instance.m_fermentationDuration = newFermenterDuration;
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Fermenter), "GetItemConversion")]
+        internal class ApplyFermenterItemCountChanges
+        {
+            public static void Postfix(ref Fermenter.ItemConversion __result)
+            {
+                if (configFermenterDrops.Value)
+                {
+                    
+                    int fermenterItemCount = 6;
+                    if (SkillLevel >= .5) fermenterItemCount = 7;
+                    if (SkillLevel >= .75) fermenterItemCount = 8;
+                    if (SkillLevel >= 1) fermenterItemCount = 9;
+                    if (fermenterItemCount > 0)
+                    {
+                        __result.m_producedItems = fermenterItemCount;
+                    }
                 }
             }
         }
