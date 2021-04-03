@@ -1,0 +1,10 @@
+{
+    "name": "CookingSkill",
+    "version_number": "1.1.4",
+    "website_url": "https://github.com/thegreyham/Valheim.CookingSkill",
+    "description": "Introduces a new Cooking Skill that buffs your food as it levels.",
+    "dependencies": [
+        "pipakin-SkillInjector-1.1.1",
+        "denikson-BepInExPack_Valheim-5.4.800"
+      ]
+}
