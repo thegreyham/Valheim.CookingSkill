@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.IO;
 using UnityEngine;
+using System.Linq;
 
 namespace CookingSkill
 {
@@ -16,7 +17,7 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.1.4";
+        public const string PluginVersion = "1.1.5";
 
         private static Harmony harmony;
 
@@ -32,6 +33,8 @@ namespace CookingSkill
         private static ConfigEntry<float> configFoodStaminaMulitplier;
         private static ConfigEntry<float> configFoodDurationMulitplier;
         private static ConfigEntry<float> configFermenterDuration;
+        private static ConfigEntry<string> configFermenterDropLevels;
+        private static ConfigEntry<int> configFermenterDropAmount;
 
         private static float SkillLevel = 0f;
 
@@ -52,7 +55,9 @@ namespace CookingSkill
             configFoodHealthMulitplier = Config.Bind<float>("Food Effects", "HealthMultiplier", 0.5f, "Buff to Health given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodDurationMulitplier = Config.Bind<float>("Food Effects", "DurationMultiplier", 1f, "Buff to Food Duration when consuming food per Cooking Skill Level. 1f = +1% / Level");
-            configFermenterDuration = Config.Bind<float>("Food Effects", "FermenterDuration", .66f, "Reduces Fermentation duration per Cooking Skill Level. 1f = -1% / Level");
+            configFermenterDuration = Config.Bind<float>("Fermenter Effects", "FermenterDuration", .66f, "Reduces Fermentation duration per Cooking Skill Level. 1f = -1% / Level");
+            configFermenterDropLevels = Config.Bind<string>("Fermenter Effects", "FermenterDropLevels", "0,1,25,50,100", "The levels at which extra fermenter drops are granted Default 50,75,100 (Meaning fermenter will drop additional items at lv50 lv75 & lv100 ");
+            configFermenterDropAmount = Config.Bind<int>("Fermenter Effects", "FermenterDropAmount", 1, "The amount of extra potions a fermenter will drop when a level requirement is met. Default 1");
 
             if (!modEnabled.Value)
                 return;
@@ -217,7 +222,7 @@ namespace CookingSkill
                 {
                     ((Player)user).RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configFermenterXPIncrease.Value * 0.5f);
                     SkillLevel = ((Player)user).GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                    //Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f} | [Level:{SkillLevel}]");
+                    Log($"[Add Item to Fermenter] Increase Cooking Skill by {configFermenterXPIncrease.Value * 0.5f} | [Level:{SkillLevel}]");
 
                     // Set the fermenter duration when adding new item to fermenter.
                     if (configFermenterDuration.Value <= 0)
@@ -396,6 +401,38 @@ namespace CookingSkill
                     //Log($"[Fermenter Awake] Update Fermenter Duration = {newFermenterDuration}");
                     __instance.m_fermentationDuration = newFermenterDuration;
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(Fermenter), "GetItemConversion")]
+        internal class ApplyFermenterItemCountChanges
+        {
+            public static void Postfix(ref Fermenter.ItemConversion __result)
+            {
+                // check droplevels length > 0 and dropamount > 0
+                if (configFermenterDropLevels.Value.Length > 0 && configFermenterDropAmount.Value > 0)
+                {
+                    // split fermenterDrops by comma to array
+                    var SkillLevelDrops = configFermenterDropLevels.Value.Split(',')
+                                                                         .Where(m => int.TryParse(m, out _))
+                                                                         .Select(m => int.Parse(m))
+                                                                         .ToList();
+                    // base fermenter count & skill level
+                    int fermenterItemCount = 6;
+                    float currentSkillLevel = SkillLevel * 100;
+                    // iterate over list
+                    for (var i = 0; i < SkillLevelDrops.Count; i++)
+                    {
+                        if (SkillLevelDrops[i] > 0)
+                        {
+                            if (currentSkillLevel >= SkillLevelDrops[i]) fermenterItemCount += configFermenterDropAmount.Value;
+                        }
+                    }
+                    if (fermenterItemCount > 6)
+                    {
+                        __result.m_producedItems = fermenterItemCount;
+                    }
+                }   
             }
         }
         #endregion
