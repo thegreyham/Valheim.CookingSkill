@@ -35,6 +35,7 @@ namespace CookingSkill
         private static ConfigEntry<float> configFermenterDuration;
         private static ConfigEntry<string> configFermenterDropLevels;
         private static ConfigEntry<int> configFermenterDropAmount;
+        private static ConfigEntry<float> configCookingStationDuration;
 
         private static float SkillLevel = 0f;
 
@@ -55,6 +56,7 @@ namespace CookingSkill
             configFoodHealthMulitplier = Config.Bind<float>("Food Effects", "HealthMultiplier", 0.5f, "Buff to Health given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodDurationMulitplier = Config.Bind<float>("Food Effects", "DurationMultiplier", 1f, "Buff to Food Duration when consuming food per Cooking Skill Level. 1f = +1% / Level");
+            configCookingStationDuration = Config.Bind<float>("Cooking Effects", "CookingStationDuration", .5f, "Reduces CookingStation cooking time per Cooking Skill Level. 1f = -1% / Level");
             configFermenterDuration = Config.Bind<float>("Fermenter Effects", "FermenterDuration", .66f, "Reduces Fermentation duration per Cooking Skill Level. 1f = -1% / Level");
             configFermenterDropLevels = Config.Bind<string>("Fermenter Effects", "FermenterDropLevels", "75,50,100", "The levels at which extra fermenter drops are granted Default 50,75,100 (Meaning fermenter will drop additional items at lv50 lv75 & lv100 ");
             configFermenterDropAmount = Config.Bind<int>("Fermenter Effects", "FermenterDropAmount", 1, "The amount of extra potions a fermenter will drop when a level requirement is met. Default 1");
@@ -172,6 +174,44 @@ namespace CookingSkill
                 }
             }
         }
+
+        [HarmonyPatch(typeof(CookingStation), "UpdateCooking")]
+        static class CookingStation_UpdateCooking_Patch
+        {
+
+            static void Prefix(CookingStation __instance, ZNetView ___m_nview)
+            {
+                if (!modEnabled.Value || !___m_nview.IsValid() || !___m_nview.IsOwner() || !EffectArea.IsPointInsideArea(__instance.transform.position, EffectArea.Type.Burning, 0.25f))
+                    return;
+
+                ZDO zdo = ___m_nview.GetZDO();
+                for (int i = 0; i < __instance.m_slots.Length; i++)
+                {
+                    string itemName = zdo.GetString("slot" + i, "");
+                    float ticks = zdo.GetFloat("slot" + i, 0f);
+                    float originalCookTime = 0f;
+                    //Log($"Num: {ticks}");
+                    if (itemName != "" && itemName != __instance.m_overCookedItem.name && itemName != null)
+                    {
+                        CookingStation.ItemConversion itemConversion = Traverse.Create(__instance).Method("GetItemConversion", new object[] { itemName }).GetValue<CookingStation.ItemConversion>();
+                        
+                        if (ticks == 1)
+                        {
+                            Log($"First Tick, setting up cooktime");
+                            originalCookTime = itemConversion.m_cookTime;
+                            float newCookTime = originalCookTime * (1f - (configCookingStationDuration.Value * SkillLevel));
+                            itemConversion.m_cookTime = newCookTime;
+                            Log($"[{SkillLevel}] Set Cooktime for {itemName} to {newCookTime}");
+                            ___m_nview.GetZDO().Set("slot" + i, itemConversion.m_cookTime);
+                            itemConversion.m_cookTime = originalCookTime;
+                            Log($"CookTime set back to {itemConversion.m_cookTime} for {itemName}");
+                        }
+                    }
+                }
+            }
+        }
+
+
 
         #endregion
 
