@@ -17,7 +17,7 @@ namespace CookingSkill
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.1.5";
+        public const string PluginVersion = "1.2.0";
 
         private static Harmony harmony;
 
@@ -181,7 +181,7 @@ namespace CookingSkill
 
             static void Prefix(CookingStation __instance, ZNetView ___m_nview)
             {
-                if (!modEnabled.Value || !___m_nview.IsValid() || !___m_nview.IsOwner() || !EffectArea.IsPointInsideArea(__instance.transform.position, EffectArea.Type.Burning, 0.25f))
+                if (configCookingStationDuration.Value == 0 || !___m_nview.IsValid() || !___m_nview.IsOwner() || !EffectArea.IsPointInsideArea(__instance.transform.position, EffectArea.Type.Burning, 0.25f))
                     return;
 
                 ZDO zdo = ___m_nview.GetZDO();
@@ -199,7 +199,11 @@ namespace CookingSkill
                         {
                             Log($"First Tick, setting up cooktime");
                             originalCookTime = itemConversion.m_cookTime;
-                            float newCookTime = originalCookTime * (1f - (configCookingStationDuration.Value * SkillLevel));
+                            // we set a -1 as we need to wait 1 second before the first tick
+                            // so the item that is cooking has already cooked for 1 second.
+                            float newCookTime = originalCookTime * (1f - (configCookingStationDuration.Value * SkillLevel)) -1;
+                            // set it so cooktime can't go below 3 seconds
+                            if (newCookTime < 3) newCookTime = 3;
                             itemConversion.m_cookTime = newCookTime;
                             Log($"[{SkillLevel}] Set Cooktime for {itemName} to {newCookTime}");
                             ___m_nview.GetZDO().Set("slot" + i, itemConversion.m_cookTime);
