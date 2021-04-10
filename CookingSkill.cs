@@ -36,6 +36,7 @@ namespace CookingSkill
         private static ConfigEntry<string> configFermenterDropLevels;
         private static ConfigEntry<int> configFermenterDropAmount;
         private static ConfigEntry<float> configCookingStationDuration;
+        private static ConfigEntry<int> configCookingStationCoalPreventionLevel;
 
         private static float SkillLevel = 0f;
 
@@ -57,12 +58,15 @@ namespace CookingSkill
             configFoodStaminaMulitplier = Config.Bind<float>("Food Effects", "StaminaMultiplier", 0.5f, "Buff to Stamina given when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configFoodDurationMulitplier = Config.Bind<float>("Food Effects", "DurationMultiplier", 1f, "Buff to Food Duration when consuming food per Cooking Skill Level. 1f = +1% / Level");
             configCookingStationDuration = Config.Bind<float>("Cooking Effects", "CookingStationDuration", .5f, "Reduces CookingStation cooking time per Cooking Skill Level. 1f = -1% / Level");
+            configCookingStationCoalPreventionLevel = Config.Bind<int>("Cooking Effects", "CookingStationCoalPreventionLevel", 75, "The level at which food on the Cooking Station will never burn");
             configFermenterDuration = Config.Bind<float>("Fermenter Effects", "FermenterDuration", .66f, "Reduces Fermentation duration per Cooking Skill Level. 1f = -1% / Level");
-            configFermenterDropLevels = Config.Bind<string>("Fermenter Effects", "FermenterDropLevels", "75,50,100", "The levels at which extra fermenter drops are granted Default 50,75,100 (Meaning fermenter will drop additional items at lv50 lv75 & lv100 ");
+            configFermenterDropLevels = Config.Bind<string>("Fermenter Effects", "FermenterDropLevels", "50,75,100", "The levels at which extra fermenter drops are granted Default 50,75,100 (Meaning fermenter will drop additional items at lv50 lv75 & lv100 ");
             configFermenterDropAmount = Config.Bind<int>("Fermenter Effects", "FermenterDropAmount", 1, "The amount of extra potions a fermenter will drop when a level requirement is met. Default 1");
 
             if (!modEnabled.Value)
                 return;
+
+            configCookingStationCoalPreventionLevel.Value = Mathf.Clamp(configCookingStationCoalPreventionLevel.Value, 0, 100);
 
             harmony = new Harmony(PluginGUID);
             harmony.PatchAll(Assembly.GetExecutingAssembly());
@@ -127,7 +131,7 @@ namespace CookingSkill
         #endregion
 
         // ==================================================================== //
-        //              COOKING STATION XP PATCHES                                 //
+        //              COOKING STATION XP PATCHES                              //
         // ==================================================================== //
 
         #region Cooking Station XP Patches
@@ -179,7 +183,7 @@ namespace CookingSkill
 
 
         // ==================================================================== //
-        //              CAULDRON  XP PATCHES                                        //
+        //              CAULDRON  XP PATCHES                                    //
         // ==================================================================== //
 
         #region Cauldron XP Patches
@@ -209,7 +213,7 @@ namespace CookingSkill
 
 
         // ==================================================================== //
-        //              FERMENTER XP PATCHES                                       //
+        //              FERMENTER XP PATCHES                                    //
         // ==================================================================== //
 
         #region Fermenter XP Patches
@@ -272,7 +276,7 @@ namespace CookingSkill
         #endregion
 
         // ==================================================================== //
-        //              BUFF PATCHES                                       //
+        //              BUFF PATCHES                                            //
         // ==================================================================== //
 
         #region Health & Stamina Food Buff Patches
@@ -424,16 +428,11 @@ namespace CookingSkill
                     float currentSkillLevel = SkillLevel * 100;
                     // iterate over list
                     for (var i = 0; i < SkillLevelDrops.Count; i++)
-                    {
-                        if (SkillLevelDrops[i] > 0)
-                        {
-                            if (currentSkillLevel >= SkillLevelDrops[i]) fermenterItemCount += configFermenterDropAmount.Value;
-                        }
-                    }
+                        if (SkillLevelDrops[i] > 0 && currentSkillLevel >= SkillLevelDrops[i])
+                            fermenterItemCount += configFermenterDropAmount.Value;     
+                    
                     if (fermenterItemCount > 6)
-                    {
                         __result.m_producedItems = fermenterItemCount;
-                    }
                 }   
             }
         }
@@ -450,31 +449,31 @@ namespace CookingSkill
                     return;
 
                 ZDO zdo = ___m_nview.GetZDO();
+                Traverse cookingStationTraverse = Traverse.Create(__instance);
                 for (int i = 0; i < __instance.m_slots.Length; i++)
                 {
                     string itemName = zdo.GetString("slot" + i, "");
                     float ticks = zdo.GetFloat("slot" + i, 0f);
                     float originalCookTime = 0f;
                     //Log($"Num: {ticks}");
-                    if (itemName != "" && itemName != __instance.m_overCookedItem.name && itemName != null)
+                    if (itemName != null && itemName != "" && itemName != __instance.m_overCookedItem.name)
                     {
-                        CookingStation.ItemConversion itemConversion = Traverse.Create(__instance).Method("GetItemConversion", new object[] { itemName }).GetValue<CookingStation.ItemConversion>();
+                        CookingStation.ItemConversion itemConversion = cookingStationTraverse.Method("GetItemConversion", new object[] { itemName }).GetValue<CookingStation.ItemConversion>();
 
                         if (ticks == 1)
                         {
-                            Log($"First Tick, setting up cooktime");
                             originalCookTime = itemConversion.m_cookTime;
                             // we set a -1 as we need to wait 1 second before the first tick
                             // so the item that is cooking has already cooked for 1 second.
                             float newCookTime = originalCookTime * (1f - (configCookingStationDuration.Value * SkillLevel)) - 1;
                             // set it so cooktime can't go below 3 seconds
                             if (newCookTime < 3) newCookTime = 3;
-                            itemConversion.m_cookTime = newCookTime;
-                            Log($"[{SkillLevel}] Set Cooktime for {itemName} to {newCookTime}");
-                            ___m_nview.GetZDO().Set("slot" + i, itemConversion.m_cookTime);
-                            itemConversion.m_cookTime = originalCookTime;
-                            Log($"CookTime set back to {itemConversion.m_cookTime} for {itemName}");
+                            //Log($"[{SkillLevel}] Set Cooktime for {itemName} to {newCookTime}");
+                            ___m_nview.GetZDO().Set("slot" + i, originalCookTime - newCookTime);
                         }
+
+                        if (configCookingStationCoalPreventionLevel.Value > 0 && SkillLevel * 100 >= configCookingStationCoalPreventionLevel.Value && ticks > itemConversion.m_cookTime && itemName == itemConversion.m_to.name)
+                            ___m_nview.GetZDO().Set("slot" + i, itemConversion.m_cookTime);
                     }
                 }
             }
