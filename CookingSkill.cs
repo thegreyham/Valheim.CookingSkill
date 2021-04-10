@@ -7,6 +7,8 @@ using System.Reflection;
 using System.IO;
 using UnityEngine;
 using System.Linq;
+using JotunnLib.Entities;
+using JotunnLib.Managers;
 
 namespace CookingSkill
 {

@@ -21,7 +21,7 @@
     <DebugSymbols>false</DebugSymbols>
     <DebugType>none</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>E:\SteamLibrary\SteamApps\common\Valheim\BepInEx\scripts\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -57,6 +57,10 @@
     </Reference>
     <Reference Include="BepInEx.Harmony">
       <HintPath>Libs\BepInEx.Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="JotunnLib">
+      <HintPath>Libs\JotunnLib.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="SkillInjector">
