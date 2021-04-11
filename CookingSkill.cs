@@ -5,6 +5,7 @@ using Pipakin.SkillInjectorMod;
 using System.Collections.Generic;
 using System.Reflection;
 using System.IO;
+using System;
 using UnityEngine;
 using System.Linq;
 using JotunnLib.Entities;
@@ -15,16 +16,19 @@ namespace CookingSkill
 
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
     [BepInDependency("com.pipakin.SkillInjectorMod")]
+    [BepInDependency("com.bepinex.plugins.jotunnlib")]
     public class CookingSkill : BaseUnityPlugin
     {
         public const string PluginGUID = "thegreyham.valheim.CookingSkill";
         public const string PluginName = "Cooking Skill";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.3.0";
 
         private static Harmony harmony;
 
         public static ConfigEntry<int> nexusID;
         public static ConfigEntry<bool> modEnabled;
+        private static ConfigEntry<bool> configEnableRecipes;
+        private static ConfigEntry<bool> configLevelGateRecipes;
 
 
         private static ConfigEntry<float> configCookingStationXPIncrease;
@@ -38,7 +42,7 @@ namespace CookingSkill
         private static ConfigEntry<string> configFermenterDropLevels;
         private static ConfigEntry<int> configFermenterDropAmount;
         private static ConfigEntry<float> configCookingStationDuration;
-        private static ConfigEntry<int> configCookingStationCoalPreventionLevel;
+        private static ConfigEntry<int> configCookingStationCoalPreventionLevel;        
 
         private static float SkillLevel = 0f;
 
@@ -50,6 +54,8 @@ namespace CookingSkill
         {
             nexusID = Config.Bind<int>("General", "NexusID", 483, "NexusMods ID for updates.");
             modEnabled = Config.Bind<bool>("General", "Enabled", true, "Enable the mod.");
+            configEnableRecipes = Config.Bind<bool>("General", "Recipe Enabled", true, "Enable Extra Recipes that this mod grants.");
+            configLevelGateRecipes = Config.Bind<bool>("General", "Recipe Level Gated", true, "Extra Recipes are unlocked at certain levels.");
 
 
             configCookingStationXPIncrease = Config.Bind<float>("Cooking Skill XP", "CookingStationXP", 1f, "Cooking skill xp gained when using the Cooking Station.");
@@ -68,6 +74,9 @@ namespace CookingSkill
             if (!modEnabled.Value)
                 return;
 
+            //if (configLevelGateRecipes.Value == true) configLevelGateRecipes.Value = false;
+            //if (configLevelGateRecipes.Value == false) configLevelGateRecipes.Value = true;
+
             configCookingStationCoalPreventionLevel.Value = Mathf.Clamp(configCookingStationCoalPreventionLevel.Value, 0, 100);
 
             harmony = new Harmony(PluginGUID);
@@ -76,6 +85,21 @@ namespace CookingSkill
             if (SkillInjector.GetSkillDef((Skills.SkillType)COOKING_SKILL_ID) == null)
                 SkillInjector.RegisterNewSkill(COOKING_SKILL_ID, "Cooking", "Improves Health and Stamina buffs from consuming food", 1.0f, LoadCustomTexture("meat_cooked.png"), Skills.SkillType.Knives);
 
+            if (configEnableRecipes.Value)
+            {
+                PrefabManager.Instance.PrefabRegister += registerPrefabs;
+                ObjectManager.Instance.ObjectRegister += initObjects;
+            }
+        }
+
+        private void registerPrefabs(object sender, EventArgs e)
+        {
+            // Create a new instance of our TestPrefab
+            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedNeckTail());
+            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedHam());
+            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedTrout());
+            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedSerpent());
+            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedLox());
         }
 
         private void OnDestroy()
@@ -116,6 +140,211 @@ namespace CookingSkill
             return texture2D;
         }
 
+        // ==================================================================== //
+        //              Recipe Stuff                                            //
+        // ==================================================================== //
+
+        #region load recipes
+        private void initObjects(object sender, EventArgs e)
+        {
+
+            // Recipes
+            ObjectManager.Instance.RegisterItem("HoneyGlazedNeckTail");
+            ObjectManager.Instance.RegisterItem("HoneyGlazedHam");
+            ObjectManager.Instance.RegisterItem("HoneyGlazedTrout");
+            ObjectManager.Instance.RegisterItem("HoneyGlazedSerpent");
+            ObjectManager.Instance.RegisterItem("HoneyGlazedLox");
+
+            ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
+            {
+                Name = "Recipe_HoneyGlazedHam",
+                Item = "HoneyGlazedHam",
+                CraftingStation = "piece_cauldron",
+                Enabled = configLevelGateRecipes.Value,
+                Requirements = new PieceRequirementConfig[]
+                {
+                    new PieceRequirementConfig()
+                    {
+                        Item = "CookedMeat",
+                        Amount = 1
+                    },
+                    new PieceRequirementConfig()
+                    {
+                        Item = "Honey",
+                        Amount = 5
+                    }
+                }
+            });
+            Log("Loaded HoneyGlazedHam");
+            ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
+            {
+                Name = "Recipe_HoneyGlazedNeckTail",
+                Item = "HoneyGlazedNeckTail",
+                CraftingStation = "piece_cauldron",
+                Enabled = configLevelGateRecipes.Value,
+                Requirements = new PieceRequirementConfig[]
+                {
+                    new PieceRequirementConfig()
+                    {
+                        Item = "NeckTailGrilled",
+                        Amount = 1
+                    },
+                    new PieceRequirementConfig()
+                    {
+                        Item = "Honey",
+                        Amount = 2
+                    }
+                }
+            });
+            Log("Loaded HoneyGlazedNeck");
+            ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
+            {
+                Name = "Recipe_HoneyGlazedTrout",
+                Item = "HoneyGlazedTrout",
+                CraftingStation = "piece_cauldron",
+                Enabled = configLevelGateRecipes.Value,
+                Requirements = new PieceRequirementConfig[]
+                {
+                    new PieceRequirementConfig()
+                    {
+                        Item = "FishCooked",
+                        Amount = 1
+                    },
+                    new PieceRequirementConfig()
+                    {
+                        Item = "Honey",
+                        Amount = 4
+                    }
+                }
+            });
+            Log("Loaded HoneyGlazedTrout");
+            ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
+            {
+                Name = "Recipe_HoneyGlazedSerpent",
+                Item = "HoneyGlazedSerpent",
+                CraftingStation = "piece_cauldron",
+                Enabled = configLevelGateRecipes.Value,
+                Requirements = new PieceRequirementConfig[]
+                {
+                    new PieceRequirementConfig()
+                    {
+                        Item = "SerpentMeatCooked",
+                        Amount = 1
+                    },
+                    new PieceRequirementConfig()
+                    {
+                        Item = "Honey",
+                        Amount = 6
+                    }
+                }
+            });
+            Log("Loaded HoneyGlazedSerpent");
+            ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
+            {
+                Name = "Recipe_HoneyGlazedLox",
+                Item = "HoneyGlazedLox",
+                CraftingStation = "piece_cauldron",
+                Enabled = configLevelGateRecipes.Value,
+                Requirements = new PieceRequirementConfig[]
+                {
+                    new PieceRequirementConfig()
+                    {
+                        Item = "CookedLoxMeat",
+                        Amount = 1
+                    },
+                    new PieceRequirementConfig()
+                    {
+                        Item = "Honey",
+                        Amount = 10
+                    }
+                }
+            });
+            Log("Loaded HoneyGlazedLox");
+        }
+        #endregion
+
+        #region enable recipe in cauldron
+        [HarmonyPatch(typeof(InventoryGui), "AddRecipeToList")]
+        internal class Patch_InventoryGui_AddRecipeToList
+        {
+            static void Prefix(Player player, Recipe recipe, ItemDrop.ItemData item,ref bool canCraft, ref InventoryGui __instance)
+            {               
+                bool isCauldronRecipe = recipe.m_craftingStation?.m_name == "$piece_cauldron";
+
+                if (!isCauldronRecipe) return;
+                Log($"{recipe.name}");
+                Log($"Skill Level = {SkillLevel}");
+                if (recipe.name == "Recipe_HoneyGlazedHam")
+                {
+                    if (SkillLevel < .2)
+                    {
+                        Log("Disable Recipe_HoneyGlazedHam");
+                        canCraft = false;
+                        //TODO move this to inventorygui update postfix to disable the crafting of the items. They are still craftable even if greyed out.
+                        __instance.m_craftButton.interactable = false;
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Unable to craft until lv20";
+                    }
+                    else
+                        canCraft = true;
+                }
+
+                if (recipe.name == "Recipe_HoneyGlazedNeckTail")
+                {
+                    if (SkillLevel < .1)
+                    {
+                        Log("Disable Recipe_HoneyGlazedNeckTail");
+                        canCraft = false;
+                    }
+                    else
+                        canCraft = true;
+                }
+
+                if (recipe.name == "Recipe_HoneyGlazedTrout")
+                {
+                    if (SkillLevel < .3)
+                    {
+                        Log("Disable Recipe_HoneyGlazedTrout");
+                        canCraft = false;
+                    }
+                    else
+                        canCraft = true;
+                }
+
+                if (recipe.name == "Recipe_HoneyGlazedSerpent")
+                {
+                    if (SkillLevel < .5)
+                    {
+                        Log("Disable Recipe_HoneyGlazedSerpent");
+                        canCraft = false;
+                    }
+                    else
+                        canCraft = true;
+                }
+
+                if (recipe.name == "Recipe_HoneyGlazedLox")
+                {
+                    if (SkillLevel < .7)
+                    {
+                        Log("Disable Recipe_HoneyGlazedLox");
+                        canCraft = false;
+                    }
+                    else
+                        canCraft = true;
+                }
+
+
+                //return true;
+
+                //canCraft = false;
+
+
+                //player.RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCauldronXPIncrease.Value);
+                //SkillLevel = player.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
+                //Log($"[Cooked Item on Cauldron] Increase Cooking Skill by {configCauldronXPIncrease.Value} | [Level:{SkillLevel}]");
+            }
+        }
+
+        #endregion
         // ==================================================================== //
         //              SPAWN DETAILS                                           //
         // ==================================================================== //
