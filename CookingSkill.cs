@@ -45,6 +45,7 @@ namespace CookingSkill
         private static ConfigEntry<int> configCookingStationCoalPreventionLevel;        
 
         private static float SkillLevel = 0f;
+        private static Dictionary<String, float> RecipeSkillLevelRequirements = new Dictionary<string, float>();
 
         const int COOKING_SKILL_ID = 483;  // Nexus mod id :)
         
@@ -74,8 +75,6 @@ namespace CookingSkill
             if (!modEnabled.Value)
                 return;
 
-            //if (configLevelGateRecipes.Value == true) configLevelGateRecipes.Value = false;
-            //if (configLevelGateRecipes.Value == false) configLevelGateRecipes.Value = true;
 
             configCookingStationCoalPreventionLevel.Value = Mathf.Clamp(configCookingStationCoalPreventionLevel.Value, 0, 100);
 
@@ -99,7 +98,7 @@ namespace CookingSkill
             PrefabManager.Instance.RegisterPrefab(new HoneyGlazedHam());
             PrefabManager.Instance.RegisterPrefab(new HoneyGlazedTrout());
             PrefabManager.Instance.RegisterPrefab(new HoneyGlazedSerpent());
-            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedLox());
+            PrefabManager.Instance.RegisterPrefab(new HoneyGlazedLoxPrefab());
         }
 
         private void OnDestroy()
@@ -155,27 +154,7 @@ namespace CookingSkill
             ObjectManager.Instance.RegisterItem("HoneyGlazedSerpent");
             ObjectManager.Instance.RegisterItem("HoneyGlazedLox");
 
-            ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
-            {
-                Name = "Recipe_HoneyGlazedHam",
-                Item = "HoneyGlazedHam",
-                CraftingStation = "piece_cauldron",
-                Enabled = configLevelGateRecipes.Value,
-                Requirements = new PieceRequirementConfig[]
-                {
-                    new PieceRequirementConfig()
-                    {
-                        Item = "CookedMeat",
-                        Amount = 1
-                    },
-                    new PieceRequirementConfig()
-                    {
-                        Item = "Honey",
-                        Amount = 5
-                    }
-                }
-            });
-            Log("Loaded HoneyGlazedHam");
+            ObjectManager.Instance.RegisterRecipe(new HoneyGlazedLoxRecipe(configLevelGateRecipes.Value));
             ObjectManager.Instance.RegisterRecipe(new RecipeConfig()
             {
                 Name = "Recipe_HoneyGlazedNeckTail",
@@ -260,6 +239,8 @@ namespace CookingSkill
                 }
             });
             Log("Loaded HoneyGlazedLox");
+
+            RecipeSkillLevelRequirements["Recipe_HoneyGlazedLox"] = HoneyGlazedLoxRecipe.SkillLevelRequirement;
         }
         #endregion
 
@@ -268,79 +249,49 @@ namespace CookingSkill
         internal class Patch_InventoryGui_AddRecipeToList
         {
             static void Prefix(Player player, Recipe recipe, ItemDrop.ItemData item,ref bool canCraft, ref InventoryGui __instance)
-            {               
+            {
+                if (!configLevelGateRecipes.Value) return;
+                
                 bool isCauldronRecipe = recipe.m_craftingStation?.m_name == "$piece_cauldron";
 
                 if (!isCauldronRecipe) return;
                 Log($"{recipe.name}");
                 Log($"Skill Level = {SkillLevel}");
+
+                if (RecipeSkillLevelRequirements.ContainsKey(recipe.name))
+                {
+                    if (SkillLevel < RecipeSkillLevelRequirements[recipe.name]) canCraft = false;
+                    else canCraft = true;
+                }
                 if (recipe.name == "Recipe_HoneyGlazedHam")
                 {
-                    if (SkillLevel < .2)
-                    {
-                        Log("Disable Recipe_HoneyGlazedHam");
-                        canCraft = false;
-                        //TODO move this to inventorygui update postfix to disable the crafting of the items. They are still craftable even if greyed out.
-                        //__instance.m_craftButton.interactable = false;
-                        //__instance.m_craftButton.GetComponent<UITooltip>().m_text = "Unable to craft until lv20";
-                    }
-                    else
-                        canCraft = true;
+                    if (SkillLevel < .2) canCraft = false;
+                    else canCraft = true;
                 }
 
                 if (recipe.name == "Recipe_HoneyGlazedNeckTail")
                 {
-                    if (SkillLevel < .1)
-                    {
-                        Log("Disable Recipe_HoneyGlazedNeckTail");
-                        canCraft = false;
-                    }
-                    else
-                        canCraft = true;
+                    if (SkillLevel < .1) canCraft = false;
+                    else canCraft = true;
                 }
 
                 if (recipe.name == "Recipe_HoneyGlazedTrout")
                 {
-                    if (SkillLevel < .3)
-                    {
-                        Log("Disable Recipe_HoneyGlazedTrout");
-                        canCraft = false;
-                    }
-                    else
-                        canCraft = true;
+                    if (SkillLevel < .3) canCraft = false;
+                    else canCraft = true;
                 }
 
                 if (recipe.name == "Recipe_HoneyGlazedSerpent")
                 {
-                    if (SkillLevel < .5)
-                    {
-                        Log("Disable Recipe_HoneyGlazedSerpent");
-                        canCraft = false;
-                    }
-                    else
-                        canCraft = true;
+                    if (SkillLevel < .7) canCraft = false;
+                    else canCraft = true;
                 }
 
-                if (recipe.name == "Recipe_HoneyGlazedLox")
+                /*if (recipe.name == "Recipe_HoneyGlazedLox")
                 {
-                    if (SkillLevel < .7)
-                    {
-                        Log("Disable Recipe_HoneyGlazedLox");
-                        canCraft = false;
-                    }
-                    else
-                        canCraft = true;
-                }
-
-
-                //return true;
-
-                //canCraft = false;
-
-
-                //player.RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCauldronXPIncrease.Value);
-                //SkillLevel = player.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
-                //Log($"[Cooked Item on Cauldron] Increase Cooking Skill by {configCauldronXPIncrease.Value} | [Level:{SkillLevel}]");
+                    if (SkillLevel < RecipeSkillLevelRequirements[recipe.name]) canCraft = false;
+                    else canCraft = true;
+                }*/
             }
         }
 
@@ -349,7 +300,16 @@ namespace CookingSkill
         {
             static void Postfix(ref InventoryGui __instance, Player player)
             {
+                if (!configLevelGateRecipes.Value) return;
+
                 Recipe selectedRecipe = ((KeyValuePair<Recipe, ItemDrop.ItemData>)AccessTools.Field(typeof(InventoryGui), "m_selectedRecipe").GetValue(__instance)).Key;
+
+                if (RecipeSkillLevelRequirements.ContainsKey(selectedRecipe.name) && __instance.m_craftButton.interactable && SkillLevel < RecipeSkillLevelRequirements[selectedRecipe.name])
+                {
+                    __instance.m_craftButton.GetComponent<UITooltip>().m_text = $"Requires Cooking Skill lv {(int)(RecipeSkillLevelRequirements[selectedRecipe.name]*100)} to Craft";
+                    __instance.m_craftButton.interactable = false;
+                }
+
                 if (selectedRecipe.name == "Recipe_HoneyGlazedNeckTail" && SkillLevel < .1)
                 {
                     if (__instance.m_craftButton.interactable)
@@ -374,38 +334,22 @@ namespace CookingSkill
                         __instance.m_craftButton.interactable = false;
                     }
                 }
-                if (selectedRecipe.name == "Recipe_HoneyGlazedSerpent" && SkillLevel < .5)
+                if (selectedRecipe.name == "Recipe_HoneyGlazedSerpent" && SkillLevel < .7)
                 {
                     if (__instance.m_craftButton.interactable)
                     {
-                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 50 to Craft";
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 70 to Craft";
                         __instance.m_craftButton.interactable = false;
                     }
                 }
-                if (selectedRecipe.name == "Recipe_HoneyGlazedLox" && SkillLevel < .5)
+                /*if (selectedRecipe.name == "Recipe_HoneyGlazedLox" && SkillLevel < HoneyGlazedLoxRecipe.SkillLevelRequirement)
                 {
                     if (__instance.m_craftButton.interactable)
                     {
-                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 50 to Craft";
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = $"Requires Cooking Skill lv {(int)(HoneyGlazedLoxRecipe.SkillLevelRequirement * 100)} to Craft";
                         __instance.m_craftButton.interactable = false;
                     }
-                }
-                //Log($"[update recipe post] Recipe: {selectedRecipe}");
-                //if (selectedRecipe && SkillRequirement.skillRequirements.ContainsKey(selectedRecipe.name))
-                //{
-                //    SkillRequirement skillRecipe = SkillRequirement.skillRequirements[selectedRecipe.name];
-                //    Dictionary<Skills.SkillType, Skills.Skill> m_skillData = AccessTools.Field(typeof(Skills), "m_skillData").GetValue(player.GetSkills()) as Dictionary<Skills.SkillType, Skills.Skill>;
-                //    if (m_skillData.ContainsKey(skillRecipe.m_skill))
-                //    {
-                //        string message = $"Requires Lvl {skillRecipe.m_requiredLevel} in {SkillRequirement.GetSkillName(skillRecipe.m_skill)}";
-                //        __instance.m_recipeDecription.text += Localization.instance.Localize($"\n\n{message}\n");
-                //        if (__instance.m_craftButton.interactable && !SkillRequirement.GoodEnough(player, selectedRecipe))
-                //        {
-                //            __instance.m_craftButton.GetComponent<UITooltip>().m_text = message;
-                //            __instance.m_craftButton.interactable = false;
-                //        }
-                //    }
-                //}e
+                }*/
             }
         }
 
