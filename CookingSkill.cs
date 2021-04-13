@@ -281,8 +281,8 @@ namespace CookingSkill
                         Log("Disable Recipe_HoneyGlazedHam");
                         canCraft = false;
                         //TODO move this to inventorygui update postfix to disable the crafting of the items. They are still craftable even if greyed out.
-                        __instance.m_craftButton.interactable = false;
-                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Unable to craft until lv20";
+                        //__instance.m_craftButton.interactable = false;
+                        //__instance.m_craftButton.GetComponent<UITooltip>().m_text = "Unable to craft until lv20";
                     }
                     else
                         canCraft = true;
@@ -341,6 +341,71 @@ namespace CookingSkill
                 //player.RaiseSkill((Skills.SkillType)COOKING_SKILL_ID, configCauldronXPIncrease.Value);
                 //SkillLevel = player.GetSkillFactor((Skills.SkillType)COOKING_SKILL_ID);
                 //Log($"[Cooked Item on Cauldron] Increase Cooking Skill by {configCauldronXPIncrease.Value} | [Level:{SkillLevel}]");
+            }
+        }
+
+        [HarmonyPatch(typeof(InventoryGui), "UpdateRecipe")]
+        internal class Patch_InventoryGui_UpdateRecipe
+        {
+            static void Postfix(ref InventoryGui __instance, Player player)
+            {
+                Recipe selectedRecipe = ((KeyValuePair<Recipe, ItemDrop.ItemData>)AccessTools.Field(typeof(InventoryGui), "m_selectedRecipe").GetValue(__instance)).Key;
+                if (selectedRecipe.name == "Recipe_HoneyGlazedNeckTail" && SkillLevel < .1)
+                {
+                    if (__instance.m_craftButton.interactable)
+                    {
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 10 to Craft";
+                        __instance.m_craftButton.interactable = false;
+                    }
+                }
+                if (selectedRecipe.name == "Recipe_HoneyGlazedHam" && SkillLevel < .2)
+                {
+                    if (__instance.m_craftButton.interactable)
+                    {
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 20 to Craft";
+                        __instance.m_craftButton.interactable = false;
+                    }
+                }
+                if (selectedRecipe.name == "Recipe_HoneyGlazedTrout" && SkillLevel < .3)
+                {
+                    if (__instance.m_craftButton.interactable)
+                    {
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 30 to Craft";
+                        __instance.m_craftButton.interactable = false;
+                    }
+                }
+                if (selectedRecipe.name == "Recipe_HoneyGlazedSerpent" && SkillLevel < .5)
+                {
+                    if (__instance.m_craftButton.interactable)
+                    {
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 50 to Craft";
+                        __instance.m_craftButton.interactable = false;
+                    }
+                }
+                if (selectedRecipe.name == "Recipe_HoneyGlazedLox" && SkillLevel < .5)
+                {
+                    if (__instance.m_craftButton.interactable)
+                    {
+                        __instance.m_craftButton.GetComponent<UITooltip>().m_text = "Requires Cooking Skill lv 50 to Craft";
+                        __instance.m_craftButton.interactable = false;
+                    }
+                }
+                //Log($"[update recipe post] Recipe: {selectedRecipe}");
+                //if (selectedRecipe && SkillRequirement.skillRequirements.ContainsKey(selectedRecipe.name))
+                //{
+                //    SkillRequirement skillRecipe = SkillRequirement.skillRequirements[selectedRecipe.name];
+                //    Dictionary<Skills.SkillType, Skills.Skill> m_skillData = AccessTools.Field(typeof(Skills), "m_skillData").GetValue(player.GetSkills()) as Dictionary<Skills.SkillType, Skills.Skill>;
+                //    if (m_skillData.ContainsKey(skillRecipe.m_skill))
+                //    {
+                //        string message = $"Requires Lvl {skillRecipe.m_requiredLevel} in {SkillRequirement.GetSkillName(skillRecipe.m_skill)}";
+                //        __instance.m_recipeDecription.text += Localization.instance.Localize($"\n\n{message}\n");
+                //        if (__instance.m_craftButton.interactable && !SkillRequirement.GoodEnough(player, selectedRecipe))
+                //        {
+                //            __instance.m_craftButton.GetComponent<UITooltip>().m_text = message;
+                //            __instance.m_craftButton.interactable = false;
+                //        }
+                //    }
+                //}e
             }
         }
 
