@@ -7,9 +7,9 @@ using JotunnLib.Entities;
 
 namespace CookingSkill
 {
-    public class HoneyGlazedNeckTail : PrefabConfig
+    public class HoneyGlazedNeckTailPrefab : PrefabConfig
     {
-        public HoneyGlazedNeckTail() : base("HoneyGlazedNeckTail", "NeckTailGrilled")
+        public HoneyGlazedNeckTailPrefab() : base("HoneyGlazedNeckTail", "NeckTailGrilled")
         {
             // Nothing to do here
             // "Prefab" wil be set for us automatically after this is called
@@ -31,6 +31,32 @@ namespace CookingSkill
             item.m_itemData.m_shared.m_foodStamina = 25;
             item.m_itemData.m_shared.m_foodRegen = 5;
             item.m_itemData.m_shared.m_foodBurnTime = 1100;
+        }
+    }
+
+
+    public class HoneyGlazedNeckTailRecipe : RecipeConfig
+    {
+        public static float SkillLevelRequirement = .1f;
+        public HoneyGlazedNeckTailRecipe()
+        {
+            Name = "Recipe_HoneyGlazedNeckTail";
+            Item = "HoneyGlazedNeckTail";
+            CraftingStation = "piece_cauldron";
+            Enabled = true;
+            Requirements = new PieceRequirementConfig[]
+            {
+                new PieceRequirementConfig()
+                {
+                    Item = "NeckTailGrilled",
+                    Amount = 1
+                },
+                new PieceRequirementConfig()
+                {
+                    Item = "Honey",
+                    Amount = 2
+                }
+            };
         }
     }
 }

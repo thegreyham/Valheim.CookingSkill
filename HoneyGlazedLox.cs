@@ -9,11 +9,7 @@ namespace CookingSkill
 {
     public class HoneyGlazedLoxPrefab : PrefabConfig
     {
-        public HoneyGlazedLoxPrefab() : base("HoneyGlazedLox", "CookedLoxMeat")
-        {
-            // Nothing to do here
-            // "Prefab" wil be set for us automatically after this is called
-        }
+        public HoneyGlazedLoxPrefab() : base("HoneyGlazedLox", "CookedLoxMeat") { }
 
         public override void Register()
         {
@@ -37,23 +33,23 @@ namespace CookingSkill
     public class HoneyGlazedLoxRecipe : RecipeConfig
     {
         public static float SkillLevelRequirement = .5f;
-        public HoneyGlazedLoxRecipe(bool enabled)
+        public HoneyGlazedLoxRecipe()
         {
-            Name = "Recipe_HoneyGlazedHam";
-            Item = "HoneyGlazedHam";
+            Name = "Recipe_HoneyGlazedLox";
+            Item = "HoneyGlazedLox";
             CraftingStation = "piece_cauldron";
-            Enabled = enabled;
+            Enabled = true;
             Requirements = new PieceRequirementConfig[]
             {
                 new PieceRequirementConfig()
                 {
-                    Item = "CookedMeat",
+                    Item = "CookedLoxMeat",
                     Amount = 1
                 },
                 new PieceRequirementConfig()
                 {
                     Item = "Honey",
-                    Amount = 5
+                    Amount = 8
                 }
             };
         }

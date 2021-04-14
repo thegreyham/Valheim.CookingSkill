@@ -8,9 +8,9 @@ using UnityEngine;
 
 namespace CookingSkill
 {
-    public class HoneyGlazedHam : PrefabConfig
+    public class HoneyGlazedHamPrefab : PrefabConfig
     {
-        public HoneyGlazedHam() : base("HoneyGlazedHam", "CookedMeat")
+        public HoneyGlazedHamPrefab() : base("HoneyGlazedHam", "CookedMeat")
         {
             // Nothing to do here
             // "Prefab" wil be set for us automatically after this is called
@@ -32,7 +32,31 @@ namespace CookingSkill
             item.m_itemData.m_shared.m_foodStamina = 35;
             item.m_itemData.m_shared.m_foodRegen = 5;
             item.m_itemData.m_shared.m_foodBurnTime = 1300;
-            item.m_itemData.m_shared.m_foodColor = new Color(255 / 255f, 100 / 255f, 86 / 255f);
+        }
+    }
+
+    public class HoneyGlazedHamRecipe : RecipeConfig
+    {
+        public static float SkillLevelRequirement = .2f;
+        public HoneyGlazedHamRecipe()
+        {
+            Name = "Recipe_HoneyGlazedHam";
+            Item = "HoneyGlazedHam";
+            CraftingStation = "piece_cauldron";
+            Enabled = true;
+            Requirements = new PieceRequirementConfig[]
+            {
+                new PieceRequirementConfig()
+                {
+                    Item = "CookedMeat",
+                    Amount = 1
+                },
+                new PieceRequirementConfig()
+                {
+                    Item = "Honey",
+                    Amount = 4
+                }
+            };
         }
     }
 }
